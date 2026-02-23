@@ -1,0 +1,58 @@
+import subprocess
+import os
+import time
+import signal
+
+class SmartAgentDisplay:
+    def __init__(self, display=":99", vnc_port=5900, web_port=6080, res="1280x720x24"):
+        self.display = display
+        self.vnc_port = vnc_port
+        self.web_port = web_port
+        self.res = res
+        self.procs = []
+
+    def start(self):
+        # 1. Clean up old lock files (Crucial for production)
+        lock_file = f"/tmp/.X11-unix/X{self.display.replace(':', '')}"
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+
+        # 2. Start Xvfb (The Virtual Monitor)
+        print(f"Creating Virtual Display {self.display}...")
+        self.procs.append(subprocess.Popen(["Xvfb", self.display, "-screen", "0", self.res]))
+        os.environ["DISPLAY"] = self.display
+        time.sleep(1)
+
+        # 3. Start a Window Manager (Prevents windows from overlapping/freezing)
+        print("Starting Window Manager (Fluxbox)...")
+        self.procs.append(subprocess.Popen(["fluxbox"], env=os.environ))
+
+        # 4. Start x11vnc (The VNC Server)
+        print(f"Starting VNC Server on port {self.vnc_port}...")
+        self.procs.append(subprocess.Popen([
+            "x11vnc", "-display", self.display, "-rfbport", str(self.vnc_port),
+            "-nopw", "-forever", "-listen", "localhost" # Local only for security
+        ]))
+
+        # 5. Start Websockify (The noVNC Bridge)
+        # Pointing to the standard noVNC web folder
+        novnc_path = "/usr/share/novnc" # Standard path on Ubuntu/Debian
+        print(f"noVNC available at: http://localhost:{self.web_port}/vnc.html")
+        self.procs.append(subprocess.Popen([
+            "websockify", f"--web={novnc_path}", str(self.web_port), f"localhost:{self.vnc_port}"
+        ]))
+
+    def stop(self):
+        print("Cleaning up display processes...")
+        for p in self.procs:
+            p.terminate()
+
+if __name__ == "__main__":
+    display = SmartAgentDisplay()
+    try:
+        display.start()
+        # YOUR AGENT CODE HERE
+        # e.g., smart_agent.run(headful=True)
+        while True: time.sleep(1) # Keep alive for viewing
+    except KeyboardInterrupt:
+        display.stop()
