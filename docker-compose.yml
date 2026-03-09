@@ -1,0 +1,40 @@
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    container_name: fara_playwright_demo
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - ./outputs:/outputs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEMO_SCENARIO=${DEMO_SCENARIO:-todomvc}
+    command: ["python", "demo_executor.py"]
+
+  demo_vnc:
+    build:
+      context: .
+      dockerfile: Dockerfile.vnc
+    container_name: fara_playwright_demo_vnc
+    profiles: ["vnc"]
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - ./outputs:/outputs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEMO_SCENARIO=${DEMO_SCENARIO:-todomvc}
+      - DEMO_HEADLESS=false
+      - DEMO_SLOW_MO_MS=${DEMO_SLOW_MO_MS:-250}
+      - DEMO_HOLD_OPEN_SECONDS=${DEMO_HOLD_OPEN_SECONDS:-15}
+      - SCREEN_WIDTH=${SCREEN_WIDTH:-1280}
+      - SCREEN_HEIGHT=${SCREEN_HEIGHT:-720}
+      - SCREEN_DEPTH=${SCREEN_DEPTH:-24}
+      - NOVNC_PORT=7900
+      - VNC_PORT=5900
+    ports:
+      - "7900:7900"
+      - "5900:5900"
+    command: ["bash", "/app/start_vnc_demo.sh"]
