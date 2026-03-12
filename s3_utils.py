@@ -1,4 +1,4 @@
-rom __future__ import annotations
+from __future__ import annotations
 
 import io
 import os
@@ -249,3 +249,64 @@ class S3Client:
             Params={"Bucket": target_bucket, "Key": key},
             ExpiresIn=expiration,
         )
+
+
+
+
+
+#routes
+
+# app/routers/files.py
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from app.dependencies import s3
+
+router = APIRouter(prefix="/files", tags=["files"])
+
+
+@router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    folder: str = Query("general", description="Target folder/prefix in S3"),
+):
+    """Upload a file into the specified folder."""
+    key = await s3.upload(file, folder)
+    return {"key": key, "message": "Uploaded successfully"}
+
+
+@router.get("/download")
+def download_file(key: str):
+    """Download a file by its full S3 key."""
+    if not s3.exists(key):
+        raise HTTPException(404, "Object not found")
+    data = s3.download(key)
+    from fastapi.responses import Response
+    return Response(content=data, media_type="application/octet-stream")
+
+
+@router.delete("/remove")
+def remove_file(key: str):
+    """Delete a single file by its S3 key."""
+    success = s3.remove(key)
+    if not success:
+        raise HTTPException(500, "Delete failed")
+    return {"deleted": key}
+
+
+@router.delete("/remove-folder")
+def remove_folder(folder: str):
+    """Delete all files under a folder prefix."""
+    count = s3.remove_folder(folder)
+    return {"deleted_count": count}
+
+
+@router.get("/list")
+def list_files(prefix: str = ""):
+    """List all keys under a prefix."""
+    return {"keys": s3.list_objects(prefix)}
+
+
+@router.get("/presigned-url")
+def presigned_url(key: str, expiration: int = 3600):
+    """Get a pre-signed URL to share a file temporarily."""
+    url = s3.generate_presigned_url(key, expiration=expiration)
+    return {"url": url, "expires_in": expiration}
